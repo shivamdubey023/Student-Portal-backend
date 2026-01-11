@@ -2,10 +2,18 @@ const express = require('express');
 const router = express.Router();
 const Course = require('../models/Course');
 const { authMiddleware } = require('../middleware/auth');
+const mockDB = require('../mockDB');
+let useMockDB = false;
+
+// Exported function to set mock mode (called from server.js on DB failure)
+router.setMockMode = (mock) => { useMockDB = mock; };
 
 // Get all courses
 router.get('/', async (req, res) => {
   try {
+    if (useMockDB) {
+      return res.json(mockDB.courses);
+    }
     const courses = await Course.find();
     res.json(courses);
   } catch (err) {
@@ -16,6 +24,11 @@ router.get('/', async (req, res) => {
 // Get course by ID
 router.get('/:id', async (req, res) => {
   try {
+    if (useMockDB) {
+      const course = mockDB.courses.find(c => c._id === req.params.id);
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      return res.json(course);
+    }
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
     res.json(course);
@@ -29,6 +42,11 @@ router.post('/', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can create courses' });
+    }
+    if (useMockDB) {
+      const course = { _id: String(mockDB.courses.length + 1), ...req.body };
+      mockDB.courses.push(course);
+      return res.status(201).json(course);
     }
     const course = new Course(req.body);
     await course.save();

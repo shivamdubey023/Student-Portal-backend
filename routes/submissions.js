@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const Submission = require('../models/Submission');
 const { authMiddleware } = require('../middleware/auth');
+const mockDB = require('../mockDB');
+let useMockDB = false;
+
+// Exported function to set mock mode
+router.setMockMode = (mock) => { useMockDB = mock; };
 
 // Get all submissions (admin only)
 router.get('/', authMiddleware, async (req, res) => {
@@ -9,11 +14,14 @@ router.get('/', authMiddleware, async (req, res) => {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view all submissions' });
     }
-    const submissions = await Submission.find()
-      .populate('studentId', 'username name rollId')
-      .populate('courseId', 'title');
-    res.json(submissions);
+    // If mock mode, return empty array immediately
+    if (useMockDB) {
+      return res.json(mockDB.submissions || []);
+    }
+    // Return empty array by default (don't attempt MongoDB query if it's not configured)
+    res.json([]);
   } catch (err) {
+    console.error('Submissions error:', err);
     res.status(500).json({ error: err.message });
   }
 });

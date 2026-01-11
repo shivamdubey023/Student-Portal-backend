@@ -9,8 +9,9 @@ const connectDB = async (uri) => {
     });
     console.log('MongoDB connected');
   } catch (err) {
-    console.error('MongoDB connection error:', err.message);
-    process.exit(1);
+    console.error('MongoDB connection error:', err);
+    // Propagate error to caller so startup can handle it and print full stack
+    throw err;
   }
 };
 
