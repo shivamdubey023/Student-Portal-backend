@@ -21,4 +21,7 @@ const requireAuth = (roles = []) => {
   };
 };
 
-module.exports = { requireAuth };
+// Alias for backward compatibility
+const authMiddleware = requireAuth();
+
+module.exports = { requireAuth, authMiddleware };

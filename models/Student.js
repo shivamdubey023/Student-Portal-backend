@@ -14,6 +14,8 @@ const StudentSchema = new mongoose.Schema({
   name: { type: String },
   email: { type: String },
   password: { type: String, required: true },
+  rollId: { type: String, unique: true, sparse: true },
+  studentId: { type: String, unique: true, sparse: true },
   role: { type: String, default: 'student' },
   locked: { type: Boolean, default: false },
   courses: { type: [AssignedCourseSchema], default: [] }
