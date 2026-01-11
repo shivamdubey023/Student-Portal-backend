@@ -149,11 +149,14 @@ router.post('/', authMiddleware, async (req, res) => {
     // Generate IDs with course info
     const ids = await generateStudentIds(primaryCourseId);
     
+    // Ensure userId is set (required field)
+    const userId = req.body.userId || req.body.username;
+    
     if (useMockDB) {
       const newStudent = {
         _id: String(mockDB.students.length + 1),
         id: String(mockDB.students.length + 1),
-        userId: req.body.username,
+        userId,
         ...req.body,
         ...ids,
         courses,
@@ -166,7 +169,8 @@ router.post('/', authMiddleware, async (req, res) => {
     }
     
     const student = new Student({ 
-      ...req.body, 
+      ...req.body,
+      userId,
       ...ids,
       courses 
     });
