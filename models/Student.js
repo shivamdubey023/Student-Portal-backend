@@ -4,8 +4,16 @@ const AssignedCourseSchema = new mongoose.Schema({
   courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
   assignedAt: { type: Date, default: Date.now },
   expiresAt: { type: Date },
-  modulesCompleted: { type: [Number], default: [] },
-  active: { type: Boolean, default: true }
+  active: { type: Boolean, default: true },
+  // Track assignment progress
+  assignmentsCompleted: { type: [Number], default: [] }, // Array of assignment orders completed
+  assignmentsSubmitted: { type: [Number], default: [] }, // Array of assignment orders submitted
+  // Track exam progress
+  examsCompleted: { type: [Number], default: [] }, // Array of exam orders completed
+  examsPassed: { type: [Number], default: [] }, // Array of exam orders passed
+  // Certificate eligibility
+  eligibleForCertificate: { type: Boolean, default: false },
+  certificateIssued: { type: Boolean, default: false }
 });
 
 const StudentSchema = new mongoose.Schema({

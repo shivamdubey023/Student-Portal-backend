@@ -135,4 +135,141 @@ router.get('/submissions', async (req, res) => {
   }
 });
 
+// Add assignment to course
+router.post('/courses/:courseId/assignments', async (req, res) => {
+  const { courseId } = req.params;
+  const { title, description, blogLinks, githubLinks, studyMaterials, dueDate, repositoryUrl, instructions, order, week, releaseDate } = req.body;
+  try {
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    course.assignments.push({
+      title,
+      description,
+      blogLinks: blogLinks || [],
+      githubLinks: githubLinks || [],
+      studyMaterials: studyMaterials || [],
+      dueDate: new Date(dueDate),
+      repositoryUrl,
+      instructions,
+      order: order || course.assignments.length + 1,
+      week: week || 1,
+      releaseDate: releaseDate ? new Date(releaseDate) : new Date(),
+      isVisible: true
+    });
+
+    await course.save();
+    return res.json({ message: 'Assignment added', assignmentId: course.assignments[course.assignments.length - 1]._id });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Add exam to course
+router.post('/courses/:courseId/exams', async (req, res) => {
+  const { courseId } = req.params;
+  const { title, description, questions, passingScore, duration, dueDate, order, week, releaseDate } = req.body;
+  try {
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    course.exams.push({
+      title,
+      description,
+      questions,
+      passingScore: passingScore || 70,
+      duration: duration || 60,
+      dueDate: new Date(dueDate),
+      order: order || course.exams.length + 1,
+      week: week || 1,
+      releaseDate: releaseDate ? new Date(releaseDate) : new Date(),
+      isVisible: true
+    });
+
+    await course.save();
+    return res.json({ message: 'Exam added', examId: course.exams[course.exams.length - 1]._id });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Review assignment submission
+router.post('/submissions/:submissionId/review', async (req, res) => {
+  const { submissionId } = req.params;
+  const { status, feedback } = req.body;
+  try {
+    const submission = await Submission.findById(submissionId);
+    if (!submission || submission.type !== 'assignment') {
+      return res.status(404).json({ message: 'Assignment submission not found' });
+    }
+
+    submission.assignmentSubmission.status = status;
+    submission.assignmentSubmission.feedback = feedback;
+    submission.assignmentSubmission.reviewedAt = new Date();
+
+    // Update student's progress if approved
+    if (status === 'Approved') {
+      const student = await Student.findById(submission.assignmentSubmission.studentId);
+      const courseAssignment = student.courses.find(c => c.courseId.toString() === submission.assignmentSubmission.courseId.toString());
+      if (courseAssignment && !courseAssignment.assignmentsCompleted.includes(submission.assignmentSubmission.assignmentOrder)) {
+        courseAssignment.assignmentsCompleted.push(submission.assignmentSubmission.assignmentOrder);
+      }
+    }
+
+    await submission.save();
+    return res.json({ message: 'Submission reviewed' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Issue certificate
+router.post('/students/:userId/course/:courseId/certificate', async (req, res) => {
+  const { userId, courseId } = req.params;
+  try {
+    const student = await Student.findOne({ userId });
+    const course = await Course.findById(courseId);
+    if (!student || !course) return res.status(404).json({ message: 'Student or course not found' });
+
+    const courseAssignment = student.courses.find(c => c.courseId.toString() === courseId);
+    if (!courseAssignment) return res.status(404).json({ message: 'Course not assigned' });
+
+    // Check eligibility
+    const totalAssignments = course.assignments.length;
+    const totalExams = course.exams.length;
+    const completedAssignments = courseAssignment.assignmentsCompleted.length;
+    const passedExams = courseAssignment.examsPassed.length;
+
+    if (completedAssignments < totalAssignments || passedExams < totalExams) {
+      return res.status(400).json({ message: 'Student not eligible for certificate' });
+    }
+
+    // Generate certificate number
+    const certificateNumber = `CERT-${Date.now()}-${userId}`;
+
+    const certificateSubmission = new Submission({
+      type: 'certificate',
+      certificate: {
+        studentId: student._id,
+        courseId: course._id,
+        certificateNumber,
+        paymentStatus: 'Pending',
+        paymentAmount: course.certificateFee
+      }
+    });
+
+    await certificateSubmission.save();
+    courseAssignment.certificateIssued = true;
+    await student.save();
+
+    return res.json({ message: 'Certificate issued', certificateNumber });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
