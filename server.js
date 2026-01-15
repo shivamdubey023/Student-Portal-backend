@@ -30,10 +30,11 @@ const startServer = async () => {
   // If using mock DB, enable mock mode on all routes
   if (usingMock) {
     const mockDB = require('./mockDB');
-    // Enable mock mode on courses, students, and submissions routes
+    // Enable mock mode on courses, students, submissions, and admin routes
     require('./routes/courses').setMockMode(true);
     require('./routes/students').setMockMode(true);
     require('./routes/submissions').setMockMode(true);
+    require('./routes/admin').setMockMode(true);
     // Add debug routes
     app.post('/debug/courses', (req, res) => {
       const { title, description } = req.body || {};

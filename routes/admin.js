@@ -5,6 +5,12 @@ const { requireAuth } = require('../middleware/auth');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
 const Submission = require('../models/Submission');
+const mockDB = require('../mockDB');
+
+let useMockDB = false;
+
+// Exported function to set mock mode
+router.setMockMode = (mock) => { useMockDB = mock; };
 
 // Middleware: admin only
 router.use(requireAuth('admin'));
@@ -14,16 +20,46 @@ router.post('/students', async (req, res) => {
   const { username, name, email, password } = req.body;
   try {
     const uid = username || `S${Date.now()}`;
+    
+    if (useMockDB) {
+      // Check if student already exists in mock DB
+      const existing = mockDB.students.find(s => s.username === uid || s.userId === uid);
+      if (existing) return res.status(400).json({ error: 'user already exists' });
+      
+      // Generate rollId for mock DB
+      const count = mockDB.students.length + 2001;
+      const rollId = `STD-${count}`;
+      
+      // Hash password for mock DB (consistent with real DB)
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Create student in mock DB
+      const student = {
+        id: String(mockDB.students.length + 1),
+        userId: uid,
+        username: uid,
+        name: name || uid,
+        email: email || `${uid}@example.com`,
+        password: hashedPassword, // Store hashed password
+        rollId: rollId,
+        locked: false,
+        assignedCourses: []
+      };
+      
+      mockDB.students.push(student);
+      return res.json({ student: { rollId: rollId } });
+    }
+    
     // ensure both userId and username are set so older flows continue to work
     const existing = await Student.findOne({ $or: [{ userId: uid }, { username: uid }] });
-    if (existing) return res.status(400).json({ message: 'user already exists' });
+    if (existing) return res.status(400).json({ error: 'user already exists' });
     const hashed = await bcrypt.hash(password, 10);
     const student = new Student({ userId: uid, username: uid, name, email, password: hashed });
     await student.save();
-    return res.json({ message: 'Student created', userId: uid });
+    return res.json({ student: { rollId: uid } });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 
