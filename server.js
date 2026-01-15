@@ -30,11 +30,12 @@ const startServer = async () => {
   // If using mock DB, enable mock mode on all routes
   if (usingMock) {
     const mockDB = require('./mockDB');
-    // Enable mock mode on courses, students, submissions, and admin routes
+    // Enable mock mode on courses, students, submissions, admin, and auth routes
     require('./routes/courses').setMockMode(true);
     require('./routes/students').setMockMode(true);
     require('./routes/submissions').setMockMode(true);
     require('./routes/admin').setMockMode(true);
+    require('./routes/auth').setMockMode(true);
     // Add debug routes
     app.post('/debug/courses', (req, res) => {
       const { title, description } = req.body || {};
@@ -84,6 +85,18 @@ app.options('*', cors(corsOptions));
 
 app.use(morgan('dev'));
 app.use(bodyParser.json());
+
+// Seed endpoint for deployed database
+app.post('/api/seed', async (req, res) => {
+  try {
+    const seedAdmin = require('./seedAdmin');
+    await seedAdmin();
+    res.json({ message: 'Database seeded successfully', credentials: { admin: 'Ankit/0806', student: 'Sreya/0806' } });
+  } catch (err) {
+    console.error('Seeding error:', err);
+    res.status(500).json({ error: 'Failed to seed database' });
+  }
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
