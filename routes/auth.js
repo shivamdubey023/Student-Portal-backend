@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const mockDB = require('../mockDB');
 const Admin = require('../models/Admin');
 const Student = require('../models/Student');
+const User = require('../models/User');
 
 // Check if we're using mock DB (set by server.js)
 let useMockDB = false;
@@ -18,37 +19,40 @@ router.post('/login', async (req, res) => {
     if (!password) return res.status(400).json({ message: 'Invalid password' });
     if (!role || (role !== 'admin' && role !== 'student')) return res.status(400).json({ message: 'Invalid role' });
 
-    if (role === 'admin') {
-      if (useMockDB) {
+    if (useMockDB) {
+      // Mock DB logic remains the same
+      if (role === 'admin') {
         const admin = mockDB.admins.find(a => a.username === username);
         if (!admin) return res.status(401).json({ message: 'Invalid username' });
         if (!await bcrypt.compare(password, admin.password)) return res.status(401).json({ message: 'Invalid password' });
         const token = jwt.sign({ id: admin.id, role: 'admin', username: admin.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '8h' });
         return res.json({ token, role: 'admin' });
       } else {
-        const admin = await Admin.findOne({ username });
-        if (!admin) return res.status(401).json({ message: 'Invalid username' });
-        if (!await bcrypt.compare(password, admin.password)) return res.status(401).json({ message: 'Invalid password' });
-        const token = jwt.sign({ id: admin._id, role: 'admin', username: admin.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '8h' });
-        return res.json({ token, role: 'admin' });
+        const student = mockDB.students.find(s => s.username === username);
+        if (!student) return res.status(401).json({ message: 'Invalid username' });
+        if (student.locked) return res.status(403).json({ message: 'Account locked; contact admin' });
+        if (!await bcrypt.compare(password, student.password)) return res.status(401).json({ message: 'Invalid password' });
+        const token = jwt.sign({ id: student.id, role: 'student', username: student.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '7d' });
+        return res.json({ token, role: 'student', username: student.username });
       }
-    }
-
-    // student
-    if (useMockDB) {
-      const student = mockDB.students.find(s => s.username === username);
-      if (!student) return res.status(401).json({ message: 'Invalid username' });
-      if (student.locked) return res.status(403).json({ message: 'Account locked; contact admin' });
-      if (!await bcrypt.compare(password, student.password)) return res.status(401).json({ message: 'Invalid password' });
-      const token = jwt.sign({ id: student.id, role: 'student', username: student.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '7d' });
-      return res.json({ token, role: 'student', username: student.username });
     } else {
-      const student = await Student.findOne({ username });
-      if (!student) return res.status(401).json({ message: 'Invalid username' });
-      if (student.locked) return res.status(403).json({ message: 'Account locked; contact admin' });
-      if (!await bcrypt.compare(password, student.password)) return res.status(401).json({ message: 'Invalid password' });
-      const token = jwt.sign({ id: student._id, role: 'student', username: student.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '7d' });
-      return res.json({ token, role: 'student', username: student.username });
+      // Real DB: Find user by username and role
+      const user = await User.findOne({ username, role });
+      if (!user) return res.status(401).json({ message: 'Invalid username or role' });
+      if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ message: 'Invalid password' });
+
+      if (role === 'admin') {
+        const admin = await Admin.findOne({ userId: user._id });
+        if (!admin) return res.status(401).json({ message: 'Admin account not found' });
+        const token = jwt.sign({ id: user._id, role: 'admin', username: user.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '8h' });
+        return res.json({ token, role: 'admin' });
+      } else {
+        const student = await Student.findOne({ userId: user._id });
+        if (!student) return res.status(401).json({ message: 'Student account not found' });
+        if (user.locked) return res.status(403).json({ message: 'Account locked; contact admin' });
+        const token = jwt.sign({ id: user._id, role: 'student', username: user.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '7d' });
+        return res.json({ token, role: 'student', username: user.username });
+      }
     }
   } catch (err) {
     console.error(err);

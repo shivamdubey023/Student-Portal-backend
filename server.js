@@ -24,7 +24,7 @@ const startServer = async () => {
     console.log(`Server running on port ${PORT} (mock:${usingMock})`);
     console.log('Auth ready with mock credentials:');
     console.log('  Admin: Ankit / 0806');
-    console.log('  Student: srey / 0806');
+    console.log('  Student: Sreya / 0806');
   });
 
   // If using mock DB, enable mock mode on all routes
@@ -91,7 +91,7 @@ app.post('/api/seed', async (req, res) => {
   try {
     const seedAdmin = require('./seedAdmin');
     await seedAdmin();
-    res.json({ message: 'Database seeded successfully', credentials: { admin: 'Ankit/0806', student: 'srey/0806' } });
+    res.json({ message: 'Database seeded successfully', credentials: { admin: 'Ankit/0806', student: 'Sreya/0806' } });
   } catch (err) {
     console.error('Seeding error:', err);
     res.status(500).json({ error: 'Failed to seed database' });
@@ -100,7 +100,6 @@ app.post('/api/seed', async (req, res) => {
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/admin', require('./routes/admin'));
 app.use('/api/courses', require('./routes/courses'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/submissions', require('./routes/submissions'));

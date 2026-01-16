@@ -10,7 +10,7 @@ router.use(requireAuth('student'));
 // Get student's assigned courses with assignment/exam progress
 router.get('/courses', async (req, res) => {
   try {
-    const student = await Student.findById(req.user.id).populate('courses.courseId', 'title assignments exams certificateFee');
+    const student = await Student.findOne({ userId: req.user.id }).populate('courses.courseId', 'title assignments exams certificateFee');
     if (!student) return res.status(404).json({ message: 'Student not found' });
 
     const now = new Date();
@@ -73,7 +73,7 @@ router.get('/course/:courseId/assignments', async (req, res) => {
     const course = await Course.findById(req.params.courseId);
     if (!course) return res.status(404).json({ message: 'Course not found' });
 
-    const student = await Student.findById(req.user.id);
+    const student = await Student.findOne({ userId: req.user.id });
     const assigned = student.courses.find(c => c.courseId.toString() === req.params.courseId);
     if (!assigned) return res.status(404).json({ message: 'Course not assigned' });
 
@@ -115,7 +115,7 @@ router.post('/course/:courseId/assignment/:order/submit', async (req, res) => {
 
     if (!repositoryUrl) return res.status(400).json({ message: 'Repository URL required' });
 
-    const student = await Student.findById(req.user.id);
+    const student = await Student.findOne({ userId: req.user.id });
     const assigned = student.courses.find(c => c.courseId.toString() === courseId);
     if (!assigned) return res.status(404).json({ message: 'Course not assigned' });
 
@@ -155,7 +155,7 @@ router.get('/course/:courseId/exam/:order', async (req, res) => {
     const course = await Course.findById(courseId);
     if (!course) return res.status(404).json({ message: 'Course not found' });
 
-    const student = await Student.findById(req.user.id);
+    const student = await Student.findOne({ userId: req.user.id });
     const assigned = student.courses.find(c => c.courseId.toString() === courseId);
     if (!assigned) return res.status(404).json({ message: 'Course not assigned' });
 
@@ -198,7 +198,7 @@ router.post('/course/:courseId/exam/:order/submit', async (req, res) => {
     const exam = course.exams.find(e => e.order === Number(order));
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
 
-    const student = await Student.findById(req.user.id);
+    const student = await Student.findOne({ userId: req.user.id });
     const assigned = student.courses.find(c => c.courseId.toString() === courseId);
     if (!assigned) return res.status(404).json({ message: 'Course not assigned' });
 
