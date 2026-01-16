@@ -56,5 +56,18 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Seed endpoint for deployed database
+router.post('/seed', async (req, res) => {
+  try {
+    const seedAdmin = require('./seedAdmin');
+    await seedAdmin();
+    res.json({ message: 'Database seeded successfully', credentials: { admin: 'Ankit/0806', student: 'Sreya/0806' } });
+  } catch (err) {
+    console.error('Seeding error:', err);
+    res.status(500).json({ error: 'Failed to seed database' });
+  }
+});
+
 module.exports = router;
+require('./routes/auth').setMockMode(true); // When using mock DB
 
