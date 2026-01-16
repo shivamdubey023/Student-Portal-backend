@@ -100,6 +100,7 @@ app.post('/api/seed', async (req, res) => {
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/courses', require('./routes/courses'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/submissions', require('./routes/submissions'));
