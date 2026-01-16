@@ -69,5 +69,4 @@ router.post('/seed', async (req, res) => {
 });
 
 module.exports = router;
-require('./routes/auth').setMockMode(true); // When using mock DB
 
