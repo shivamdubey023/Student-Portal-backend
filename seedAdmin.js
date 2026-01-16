@@ -5,7 +5,7 @@ const seedAdmin = async () => {
   // Fixed credentials for MVP
   const adminUser = process.env.ADMIN_USER || 'Ankit';
   const adminPass = process.env.ADMIN_PASS || '0806';
-  const studentUser = process.env.DEFAULT_STUDENT || 'Sreya';
+  const studentUser = process.env.DEFAULT_STUDENT || 'srey';
   const studentPass = process.env.DEFAULT_STUDENT_PASS || '0806';
 
   // Seed admin
