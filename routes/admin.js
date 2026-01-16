@@ -15,6 +15,21 @@ router.setMockMode = (mock) => { useMockDB = mock; };
 // Middleware: admin only
 router.use(requireAuth('admin'));
 
+// Get all students
+router.get('/students', async (req, res) => {
+  try {
+    if (useMockDB) {
+      return res.json(mockDB.students);
+    } else {
+      const students = await Student.find({});
+      return res.json(students);
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Create student
 router.post('/students', async (req, res) => {
   const { username, name, email, password } = req.body;
