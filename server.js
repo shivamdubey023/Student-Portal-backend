@@ -13,6 +13,9 @@ const startServer = async () => {
   let usingMock = false;
   try {
     await connectDB();
+    // Seed default admin and student users
+    const seedAdmin = require('./seedAdmin');
+    await seedAdmin();
   } catch (err) {
     console.error('MongoDB connection failed; falling back to in-memory mock DB for development.');
     console.error(err.message || err);
