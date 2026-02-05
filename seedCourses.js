@@ -118,6 +118,64 @@ const SAMPLE_COURSES = [
     price: 0,
     durationMonths: 2,
     enrolledCount: 0
+  },
+  {
+    title: 'Python Programming',
+    description: 'Learn Python from scratch and master fundamental programming concepts.',
+    overview: 'Learn Python from scratch and master fundamental programming concepts. Build scalable applications with hands-on projects covering data structures, OOP, and real-world problem-solving.',
+    duration: '1 Month',
+    mode: 'Remote',
+    category: 'Core Training',
+    tools: ['Python 3', 'VS Code', 'Git', 'Jupyter Notebook', 'pytest', 'Data Structures', 'Algorithms'],
+    learnTopics: [
+      'Python Basics and syntax fundamentals',
+      'Control Flow & Data Structures',
+      'Functions & Code Structure',
+      'File Handling & Error Handling',
+      'Object-Oriented Programming (OOP)',
+      'Intermediate Python Concepts'
+    ],
+    projects: {
+      minor: [
+        'Smart Student Analytics System',
+        'Persistent Task & Notes Manager',
+        'Personal Finance & Expense Analyzer'
+      ],
+      major: 'Python Utility Hub (Aggregator Project)'
+    },
+    certification: 'Upon successful completion, you\'ll receive a Python Development Training Certificate with a unique verification ID. This certificate recognizes your programming expertise and practical problem-solving skills.',
+    price: 0,
+    durationMonths: 1,
+    enrolledCount: 0
+  },
+  {
+    title: 'JavaScript Learning Course',
+    description: 'Master JavaScript fundamentals and build interactive web applications.',
+    overview: 'Learn JavaScript from basics to advanced concepts, including DOM manipulation, asynchronous programming, and modern ES6+ features. Build dynamic web applications with hands-on projects.',
+    duration: '1 Month',
+    mode: 'Remote',
+    category: 'Core Training',
+    tools: ['JavaScript', 'HTML', 'CSS', 'Node.js', 'Git', 'VS Code'],
+    learnTopics: [
+      'JavaScript Basics and Variables',
+      'Functions and Scope',
+      'DOM Manipulation',
+      'Event Handling',
+      'Asynchronous JavaScript (Promises, Async/Await)',
+      'ES6+ Features and Modern JavaScript'
+    ],
+    projects: {
+      minor: [
+        'Interactive Todo List App',
+        'Weather Dashboard with API',
+        'Simple Calculator with UI'
+      ],
+      major: 'Full-Stack Web Application with JavaScript'
+    },
+    certification: 'JavaScript Learning Course Certificate upon completion.',
+    price: 0,
+    durationMonths: 1,
+    enrolledCount: 0
   }
 ];
 
