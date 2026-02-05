@@ -23,11 +23,17 @@ const startServer = async () => {
   }
 
   const PORT = process.env.PORT || 4000;
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT} (mock:${usingMock})`);
-    console.log('Auth ready with mock credentials:');
-    console.log('  Admin: Ankit / 0806');
-    console.log('  Student: Sreya / 0806');
+    if (usingMock) {
+      console.log('Auth ready with mock credentials:');
+      console.log('  Admin: Ankit / 0806');
+      console.log('  Student: Sreya / 0806');
+    } else {
+      console.log('Database seeded with default credentials:');
+      console.log('  Admin: Ankit / 0806');
+      console.log('  Student: Sreya / 0806');
+    }
   });
 
   // If using mock DB, enable mock mode on all routes

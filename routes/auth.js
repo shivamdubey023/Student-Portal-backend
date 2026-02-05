@@ -36,7 +36,7 @@ router.post('/login', async (req, res) => {
         return res.json({ token, role: 'student', username: student.username });
       }
     } else {
-      // Real DB: Find user by username and role
+      // Real DB: Find user by username and role combination
       const user = await User.findOne({ username, role });
       if (!user) return res.status(401).json({ message: 'Invalid username or role' });
       if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ message: 'Invalid password' });

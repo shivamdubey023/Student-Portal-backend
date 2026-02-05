@@ -13,43 +13,83 @@ const seedAdmin = async () => {
   // Seed admin user
   let adminUserDoc = await User.findOne({ username: adminUser, role: 'admin' });
   if (!adminUserDoc) {
-    const hashed = await bcrypt.hash(adminPass, 10);
-    adminUserDoc = new User({ username: adminUser, password: hashed, role: 'admin' });
-    await adminUserDoc.save();
-    console.log('Seeded admin user:', adminUser);
+    try {
+      const hashed = await bcrypt.hash(adminPass, 10);
+      adminUserDoc = new User({ username: adminUser, password: hashed, role: 'admin', email: 'admin@example.com' });
+      await adminUserDoc.save();
+      console.log('✓ Seeded admin user:', adminUser);
+    } catch (err) {
+      if (err.code === 11000) {
+        console.log('✓ Admin user already exists');
+        adminUserDoc = await User.findOne({ username: adminUser, role: 'admin' });
+      } else {
+        console.error('Error seeding admin user:', err.message);
+        throw err;
+      }
+    }
   } else {
-    console.log('Admin user already exists');
+    console.log('✓ Admin user already exists');
   }
 
   // Seed admin record
-  const existingAdmin = await Admin.findOne({ userId: adminUserDoc._id });
-  if (!existingAdmin) {
-    const admin = new Admin({ userId: adminUserDoc._id });
-    await admin.save();
-    console.log('Seeded admin record');
-  } else {
-    console.log('Admin record already exists');
+  if (adminUserDoc) {
+    const existingAdmin = await Admin.findOne({ userId: adminUserDoc._id });
+    if (!existingAdmin) {
+      try {
+        const admin = new Admin({ userId: adminUserDoc._id });
+        await admin.save();
+        console.log('✓ Seeded admin record');
+      } catch (err) {
+        if (err.code === 11000) {
+          console.log('✓ Admin record already exists');
+        } else {
+          console.error('Error seeding admin record:', err.message);
+        }
+      }
+    } else {
+      console.log('✓ Admin record already exists');
+    }
   }
 
   // Seed default student user
   let studentUserDoc = await User.findOne({ username: studentUser, role: 'student' });
   if (!studentUserDoc) {
-    const hashedS = await bcrypt.hash(studentPass, 10);
-    studentUserDoc = new User({ username: studentUser, password: hashedS, role: 'student', name: studentUser });
-    await studentUserDoc.save();
-    console.log('Seeded default student user:', studentUser);
+    try {
+      const hashedS = await bcrypt.hash(studentPass, 10);
+      studentUserDoc = new User({ username: studentUser, password: hashedS, role: 'student', name: studentUser, email: 'student@example.com' });
+      await studentUserDoc.save();
+      console.log('✓ Seeded default student user:', studentUser);
+    } catch (err) {
+      if (err.code === 11000) {
+        console.log('✓ Default student user already exists');
+        studentUserDoc = await User.findOne({ username: studentUser, role: 'student' });
+      } else {
+        console.error('Error seeding student user:', err.message);
+        throw err;
+      }
+    }
   } else {
-    console.log('Default student user already exists');
+    console.log('✓ Default student user already exists');
   }
 
   // Seed student record
-  const existingStudent = await Student.findOne({ userId: studentUserDoc._id });
-  if (!existingStudent) {
-    const stu = new Student({ userId: studentUserDoc._id });
-    await stu.save();
-    console.log('Seeded default student record');
-  } else {
-    console.log('Default student record already exists');
+  if (studentUserDoc) {
+    const existingStudent = await Student.findOne({ userId: studentUserDoc._id });
+    if (!existingStudent) {
+      try {
+        const stu = new Student({ userId: studentUserDoc._id });
+        await stu.save();
+        console.log('✓ Seeded default student record');
+      } catch (err) {
+        if (err.code === 11000) {
+          console.log('✓ Default student record already exists');
+        } else {
+          console.error('Error seeding student record:', err.message);
+        }
+      }
+    } else {
+      console.log('✓ Default student record already exists');
+    }
   }
 };
 

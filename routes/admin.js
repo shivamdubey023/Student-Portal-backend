@@ -5,7 +5,7 @@ const { requireAuth } = require('../middleware/auth');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
 const Submission = require('../models/Submission');
-const mockDB = require('../mockDB');
+const mockDB = require('../db');
 
 let useMockDB = false;
 
