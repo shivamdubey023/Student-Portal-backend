@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Submission = require('../models/Submission');
 const { authMiddleware } = require('../middleware/auth');
-const mockDB = require('../mockDB');
+const db = require('../db');
 let useMockDB = false;
 
 // Exported function to set mock mode
@@ -16,7 +16,7 @@ router.get('/', authMiddleware, async (req, res) => {
     }
     // If mock mode, return empty array immediately
     if (useMockDB) {
-      return res.json(mockDB.submissions || []);
+      return res.json(db.submissions || []);
     }
     // Return empty array by default (don't attempt MongoDB query if it's not configured)
     res.json([]);

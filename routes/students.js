@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Student = require('../models/Student');
 const { authMiddleware } = require('../middleware/auth');
-const mockDB = require('../mockDB');
+const db = require('../db');
 let useMockDB = false;
 
 // Exported function to set mock mode
@@ -26,15 +26,15 @@ const generateCourseCode = (courseName) => {
 // Roll ID: FST-2001 (course code, count)
 const generateStudentIds = async (courseId) => {
   if (useMockDB) {
-    const count = mockDB.students.length + 2001; // Start counting from 2001
+    const count = db.students.length + 2001; // Start counting from 2001
     const today = new Date();
     const day = String(today.getDate()).padStart(2, '0');
     const year = today.getFullYear();
-    
+
     // If we have a course, get its code; otherwise use default
     let courseCode = 'XXXX';
-    if (courseId && mockDB.courses && mockDB.courses.length > 0) {
-      const course = mockDB.courses.find(c => c._id === courseId);
+    if (courseId && db.courses && db.courses.length > 0) {
+      const course = db.courses.find(c => c._id === courseId);
       if (course) {
         courseCode = generateCourseCode(course.title);
       }
@@ -72,7 +72,7 @@ const generateStudentIds = async (courseId) => {
 
 const generateStudentIds_old = async () => {
   if (useMockDB) {
-    const count = mockDB.students.length;
+    const count = db.students.length;
     const num = String(count + 1).padStart(3, '0');
     const year = new Date().getFullYear();
     return {
@@ -154,8 +154,8 @@ router.post('/', authMiddleware, async (req, res) => {
     
     if (useMockDB) {
       const newStudent = {
-        _id: String(mockDB.students.length + 1),
-        id: String(mockDB.students.length + 1),
+        _id: String(db.students.length + 1),
+        id: String(db.students.length + 1),
         userId,
         ...req.body,
         ...ids,
@@ -163,7 +163,7 @@ router.post('/', authMiddleware, async (req, res) => {
         role: 'student',
         locked: false
       };
-      mockDB.students.push(newStudent);
+      db.students.push(newStudent);
       const { password, ...rest } = newStudent;
       return res.status(201).json({ message: 'Student created', student: rest });
     }
@@ -205,9 +205,9 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Student ID is required' });
     }
     if (useMockDB) {
-      const index = mockDB.students.findIndex(s => s._id === req.params.id || s.id === req.params.id);
+      const index = db.students.findIndex(s => s._id === req.params.id || s.id === req.params.id);
       if (index === -1) return res.status(404).json({ error: 'Student not found' });
-      mockDB.students.splice(index, 1);
+      db.students.splice(index, 1);
       return res.json({ message: 'Student deleted' });
     }
     const student = await Student.findByIdAndDelete(req.params.id);

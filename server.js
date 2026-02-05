@@ -29,7 +29,7 @@ const startServer = async () => {
 
   // If using mock DB, enable mock mode on all routes
   if (usingMock) {
-    const mockDB = require('./mockDB');
+    const db = require('./db');
     // Enable mock mode on courses, students, submissions, admin, and auth routes
     require('./routes/courses').setMockMode(true);
     require('./routes/students').setMockMode(true);
@@ -40,11 +40,11 @@ const startServer = async () => {
     app.post('/debug/courses', (req, res) => {
       const { title, description } = req.body || {};
       if (!title) return res.status(400).json({ error: 'title required' });
-      const course = { _id: String(mockDB.courses.length + 1), title, description };
-      mockDB.courses.push(course);
+      const course = { _id: String(db.courses.length + 1), title, description };
+      db.courses.push(course);
       res.status(201).json(course);
     });
-    app.get('/debug/courses', (req, res) => res.json(mockDB.courses));
+    app.get('/debug/courses', (req, res) => res.json(db.courses));
   }
 };
 

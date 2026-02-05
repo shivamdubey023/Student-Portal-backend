@@ -22,13 +22,13 @@ router.post('/login', async (req, res) => {
     if (useMockDB) {
       // Mock DB logic remains the same
       if (role === 'admin') {
-        const admin = mockDB.admins.find(a => a.username === username);
+        const admin = db.admins.find(a => a.username === username);
         if (!admin) return res.status(401).json({ message: 'Invalid username' });
         if (!await bcrypt.compare(password, admin.password)) return res.status(401).json({ message: 'Invalid password' });
         const token = jwt.sign({ id: admin.id, role: 'admin', username: admin.username }, process.env.JWT_SECRET || 'change_this_to_a_strong_secret', { expiresIn: '8h' });
         return res.json({ token, role: 'admin' });
       } else {
-        const student = mockDB.students.find(s => s.username === username);
+        const student = db.students.find(s => s.username === username);
         if (!student) return res.status(401).json({ message: 'Invalid username' });
         if (student.locked) return res.status(403).json({ message: 'Account locked; contact admin' });
         if (!await bcrypt.compare(password, student.password)) return res.status(401).json({ message: 'Invalid password' });
