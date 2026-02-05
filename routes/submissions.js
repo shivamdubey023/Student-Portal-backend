@@ -3,6 +3,7 @@ const router = express.Router();
 const Submission = require('../models/Submission');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db');
+const { exec } = require('child_process');
 let useMockDB = false;
 
 // Exported function to set mock mode
@@ -46,6 +47,53 @@ router.post('/', authMiddleware, async (req, res) => {
       studentUserId: req.user.userId
     });
     await submission.save();
+
+    // If it's an assignment submission, push to GitHub repo
+    if (submission.type === 'assignment' && submission.assignmentSubmission) {
+      const studentUsername = req.user.username;
+      const repoUrl = submission.assignmentSubmission.repositoryUrl;
+      const mainRepo = 'https://github.com/shivamdubey023/SIH';
+
+      // Use GitHub CLI to create branch and push
+      exec(`gh repo clone ${mainRepo} temp-repo -- --depth 1`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error cloning main repo: ${error}`);
+          return;
+        }
+        exec(`cd temp-repo && git checkout -b ${studentUsername}`, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error creating branch: ${error}`);
+            return;
+          }
+          exec(`cd temp-repo && git remote add student ${repoUrl}`, (error, stdout, stderr) => {
+            if (error) {
+              console.error(`Error adding remote: ${error}`);
+              return;
+            }
+            exec(`cd temp-repo && git pull student main --allow-unrelated-histories`, (error, stdout, stderr) => {
+              if (error) {
+                console.error(`Error pulling from student repo: ${error}`);
+                return;
+              }
+              exec(`cd temp-repo && git push origin ${studentUsername}`, (error, stdout, stderr) => {
+                if (error) {
+                  console.error(`Error pushing to main repo: ${error}`);
+                  return;
+                }
+                console.log(`Successfully pushed to branch ${studentUsername}`);
+                // Clean up temp repo
+                exec(`rmdir /s /q temp-repo`, (error, stdout, stderr) => {
+                  if (error) {
+                    console.error(`Error cleaning up: ${error}`);
+                  }
+                });
+              });
+            });
+          });
+        });
+      });
+    }
+
     res.status(201).json(submission);
   } catch (err) {
     res.status(400).json({ error: err.message });
