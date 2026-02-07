@@ -20,6 +20,7 @@ const StudentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   rollId: { type: String, unique: true, sparse: true },
   studentId: { type: String, unique: true, sparse: true },
+  isSuper: { type: Boolean, default: false },
   courses: { type: [AssignedCourseSchema], default: [] }
 }, { timestamps: true });
 

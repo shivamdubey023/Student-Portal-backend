@@ -3,6 +3,8 @@ const router = express.Router();
 const Student = require('../models/Student');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db');
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
 let useMockDB = false;
 
 // Exported function to set mock mode
@@ -115,9 +117,48 @@ router.get('/:id', authMiddleware, async (req, res) => {
     if (req.user.userId !== req.params.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Cannot view other student profiles' });
     }
-    const student = await Student.findById(req.params.id);
+    const student = await Student.findById(req.params.id).populate('userId', 'username name email locked');
     if (!student) return res.status(404).json({ error: 'Student not found' });
-    res.json(student);
+    const normalized = {
+      ...student.toObject(),
+      username: student.userId?.username,
+      name: student.userId?.name,
+      email: student.userId?.email,
+      locked: student.userId?.locked
+    };
+    res.json(normalized);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Change password (student only)
+router.post('/:id/change-password', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.userId !== req.params.id) {
+      return res.status(403).json({ error: 'Cannot change another user password' });
+    }
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: 'oldPassword and newPassword are required' });
+    }
+
+    if (useMockDB) {
+      const student = db.students.find(s => s.id === req.params.id || s.userId === req.params.id);
+      if (!student) return res.status(404).json({ error: 'Student not found' });
+      const ok = await bcrypt.compare(oldPassword, student.password);
+      if (!ok) return res.status(400).json({ error: 'Old password is incorrect' });
+      student.password = await bcrypt.hash(newPassword, 10);
+      return res.json({ message: 'Password updated' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const ok = await bcrypt.compare(oldPassword, user.password);
+    if (!ok) return res.status(400).json({ error: 'Old password is incorrect' });
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    return res.json({ message: 'Password updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

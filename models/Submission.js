@@ -8,6 +8,8 @@ const AssignmentSubmissionSchema = new mongoose.Schema({
   pullRequestUrl: { type: String }, // Pull request URL
   submittedAt: { type: Date, default: Date.now },
   status: { type: String, enum: ['Submitted','Reviewed','Approved','Rejected'], default: 'Submitted' },
+  score: { type: Number },
+  maxScore: { type: Number },
   feedback: { type: String },
   reviewedAt: { type: Date },
   reviewerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }

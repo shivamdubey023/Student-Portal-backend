@@ -5,11 +5,12 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, required: true, enum: ['student', 'admin'] },
   name: { type: String },
-  email: { type: String },
+  email: { type: String, required: true },
   locked: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // Compound unique index: username + role must be unique
 UserSchema.index({ username: 1, role: 1 }, { unique: true });
+UserSchema.index({ email: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('User', UserSchema);

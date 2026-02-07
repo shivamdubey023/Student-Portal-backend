@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const AssignmentSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
+  type: { type: String, enum: ['mini', 'major', 'git'], default: 'mini' },
+  marks: { type: Number, default: 10 },
   blogLinks: { type: [String], default: [] },
   githubLinks: { type: [String], default: [] },
   studyMaterials: { type: [String], default: [] }, // URLs to study materials
@@ -18,6 +20,7 @@ const AssignmentSchema = new mongoose.Schema({
 const ExamSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String },
+  marks: { type: Number, default: 20 },
   questions: [{
     question: { type: String, required: true },
     options: { type: [String], required: true }, // 4 options
@@ -43,6 +46,13 @@ const CourseSchema = new mongoose.Schema({
   learnTopics: { type: [String], default: [] },
   certification: { type: String },
   certificateFee: { type: Number, default: 59 }, // ₹59
+  validityMonths: { type: Number, default: 1 }, // Access duration from assignment date (0 or null = lifetime)
+  marksDistribution: {
+    mcq: { type: Number, default: 20 },
+    mini: { type: Number, default: 10 },
+    major: { type: Number, default: 30 },
+    git: { type: Number, default: 30 }
+  },
   assignments: { type: [AssignmentSchema], default: [] },
   exams: { type: [ExamSchema], default: [] },
   enrolledCount: { type: Number, default: 0 },

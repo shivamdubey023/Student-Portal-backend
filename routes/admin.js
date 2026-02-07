@@ -5,12 +5,45 @@ const { requireAuth } = require('../middleware/auth');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
 const Submission = require('../models/Submission');
+const User = require('../models/User');
+const Module = require('../models/Module');
+const Lesson = require('../models/Lesson');
+const StudentProgress = require('../models/StudentProgress');
 const mockDB = require('../db');
 
 let useMockDB = false;
 
 // Exported function to set mock mode
 router.setMockMode = (mock) => { useMockDB = mock; };
+
+const generateCourseCode = (courseName) => {
+  if (!courseName) return 'XXXX';
+  const words = courseName.trim().split(/\s+/);
+  if (words.length === 1) return words[0].substring(0, 3).toUpperCase();
+  return words.map(w => w[0].toUpperCase()).join('').substring(0, 3);
+};
+
+const generateStudentIds = async (courseId) => {
+  const count = await Student.countDocuments() + 2001;
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, '0');
+  const year = today.getFullYear();
+
+  let courseCode = 'XXXX';
+  if (courseId) {
+    try {
+      const course = await Course.findById(courseId);
+      if (course) courseCode = generateCourseCode(course.title);
+    } catch (e) {
+      console.warn('Could not fetch course for code generation:', e.message);
+    }
+  }
+
+  return {
+    rollId: `${courseCode}-${count}`,
+    studentId: `SIH-${courseCode}-${year}-${day}-${count}`
+  };
+};
 
 // Middleware: admin only
 router.use(requireAuth('admin'));
@@ -21,18 +54,28 @@ router.get('/students', async (req, res) => {
     if (useMockDB) {
       return res.json(mockDB.students);
     } else {
-      const students = await Student.find({});
-      return res.json(students);
+      const students = await Student.find({}).populate('userId', 'username name email locked');
+      const normalized = students.map(s => {
+        const user = s.userId || {};
+        return {
+          ...s.toObject(),
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          locked: user.locked
+        };
+      });
+      return res.json(normalized);
     }
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: err.message || 'Server error' });
   }
 });
 
 // Create student
 router.post('/students', async (req, res) => {
-  const { username, name, email, password } = req.body;
+  const { username, name, email, password, assignedCourses = [] } = req.body;
   try {
     const uid = username || `S${Date.now()}`;
     
@@ -65,25 +108,88 @@ router.post('/students', async (req, res) => {
       return res.json({ student: { rollId: rollId } });
     }
     
-    // ensure both userId and username are set so older flows continue to work
-    const existing = await Student.findOne({ $or: [{ userId: uid }, { username: uid }] });
-    if (existing) return res.status(400).json({ error: 'user already exists' });
+    if (!username || !password || !email) {
+      return res.status(400).json({ error: 'username, email and password are required' });
+    }
+
+    const existingUser = await User.findOne({ username, role: 'student' });
+    if (existingUser) return res.status(400).json({ error: 'user already exists' });
+    if (email) {
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail) return res.status(400).json({ error: 'email already exists' });
+    }
+
     const hashed = await bcrypt.hash(password, 10);
-    const student = new Student({ userId: uid, username: uid, name, email, password: hashed });
+    const user = new User({
+      username,
+      password: hashed,
+      role: 'student',
+      name,
+      email
+    });
+    await user.save();
+
+    let courseValidityMap = new Map();
+    if (Array.isArray(assignedCourses) && assignedCourses.length > 0) {
+      const courseDocs = await Course.find({ _id: { $in: assignedCourses } }, 'validityMonths');
+      courseValidityMap = new Map(courseDocs.map(c => [String(c._id), c.validityMonths]));
+    }
+
+    const courses = Array.isArray(assignedCourses) ? assignedCourses.map(courseId => {
+      const months = courseValidityMap.get(String(courseId));
+      let expiresAt = null;
+      if (typeof months === 'number' && months > 0) {
+        expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + months);
+      }
+      return {
+        courseId,
+        assignedAt: new Date(),
+        expiresAt,
+        active: true,
+        assignmentsCompleted: [],
+        assignmentsSubmitted: [],
+        examsCompleted: [],
+        examsPassed: []
+      };
+    }) : [];
+
+    const ids = await generateStudentIds(assignedCourses[0]);
+    const student = new Student({
+      userId: user._id,
+      ...ids,
+      courses
+    });
     await student.save();
-    return res.json({ student: { rollId: uid } });
+    return res.json({ student: { rollId: ids.rollId, studentId: ids.studentId } });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    if (err && err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'field';
+      return res.status(400).json({ error: `${field} already exists` });
+    }
+    return res.status(500).json({ error: err.message || 'Server error' });
   }
 });
 
 // Delete student (admin decides)
-router.delete('/students/:userId', async (req, res) => {
-  const { userId } = req.params;
+router.delete('/students/:id', async (req, res) => {
+  const { id } = req.params;
   try {
-    await Student.findOneAndDelete({ userId });
-    return res.json({ message: 'Student deleted (if existed)' });
+    if (useMockDB) {
+      const index = mockDB.students.findIndex(s => s._id === id || s.id === id || s.userId === id);
+      if (index === -1) return res.status(404).json({ error: 'Student not found' });
+      mockDB.students.splice(index, 1);
+      return res.json({ message: 'Student deleted' });
+    }
+
+    const student = await Student.findById(id);
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    await Student.findByIdAndDelete(id);
+    if (student.userId) {
+      await User.findByIdAndDelete(student.userId);
+    }
+    return res.json({ message: 'Student deleted' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });
@@ -128,15 +234,10 @@ router.post('/students/:userId/assign', async (req, res) => {
     const course = await Course.findById(courseId);
     if (!student || !course) return res.status(404).json({ message: 'Student or Course not found' });
 
-    // Pricing logic
+    // Access validity based on course setting (0 or null = lifetime)
     let expiresAt = null;
-    if (course.price === 100 || course.price === 200) {
-      expiresAt = new Date();
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year
-    } else if (course.price === 600) {
-      expiresAt = null; // lifetime; interpret null as no expiry
-    } else {
-      const months = course.durationMonths || 2;
+    const months = course.validityMonths;
+    if (typeof months === 'number' && months > 0) {
       expiresAt = new Date();
       expiresAt.setMonth(expiresAt.getMonth() + months);
     }
@@ -189,14 +290,30 @@ router.get('/submissions', async (req, res) => {
 // Add assignment to course
 router.post('/courses/:courseId/assignments', async (req, res) => {
   const { courseId } = req.params;
-  const { title, description, blogLinks, githubLinks, studyMaterials, dueDate, repositoryUrl, instructions, order, week, releaseDate } = req.body;
+  const { title, description, type, blogLinks, githubLinks, studyMaterials, dueDate, repositoryUrl, instructions, order, week, releaseDate } = req.body;
   try {
     const course = await Course.findById(courseId);
     if (!course) return res.status(404).json({ message: 'Course not found' });
 
+    const assignmentType = type === 'major' ? 'major' : (type === 'git' ? 'git' : 'mini');
+    const currentMini = course.assignments.filter(a => a.type === 'mini').length;
+    const currentMajor = course.assignments.filter(a => a.type === 'major').length;
+    const currentGit = course.assignments.filter(a => a.type === 'git').length;
+    if (assignmentType === 'mini' && currentMini >= 2) {
+      return res.status(400).json({ message: 'Only 2 mini projects allowed' });
+    }
+    if (assignmentType === 'major' && currentMajor >= 1) {
+      return res.status(400).json({ message: 'Only 1 major project allowed' });
+    }
+    if (assignmentType === 'git' && currentGit >= 1) {
+      return res.status(400).json({ message: 'Only 1 git task allowed' });
+    }
+
     course.assignments.push({
       title,
       description,
+      type: assignmentType,
+      marks: assignmentType === 'major' ? 30 : assignmentType === 'git' ? 30 : 10,
       blogLinks: blogLinks || [],
       githubLinks: githubLinks || [],
       studyMaterials: studyMaterials || [],
@@ -246,6 +363,42 @@ router.post('/courses/:courseId/exams', async (req, res) => {
   }
 });
 
+// Create module for a course
+router.post('/courses/:courseId/modules', async (req, res) => {
+  const { courseId } = req.params;
+  const { title, order } = req.body;
+  try {
+    if (!title || typeof order !== 'number') {
+      return res.status(400).json({ message: 'title and order are required' });
+    }
+    const module = new Module({ courseId, title, order });
+    await module.save();
+    return res.json({ message: 'Module created', moduleId: module._id });
+  } catch (err) {
+    console.error(err);
+    if (err.code === 11000) return res.status(400).json({ message: 'Module order already exists' });
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Create lesson under a module
+router.post('/modules/:moduleId/lessons', async (req, res) => {
+  const { moduleId } = req.params;
+  const { title, contentId, order, locked } = req.body;
+  try {
+    if (!title || !contentId || typeof order !== 'number') {
+      return res.status(400).json({ message: 'title, contentId, and order are required' });
+    }
+    const lesson = new Lesson({ moduleId, title, contentId, order, locked: !!locked });
+    await lesson.save();
+    return res.json({ message: 'Lesson created', lessonId: lesson._id });
+  } catch (err) {
+    console.error(err);
+    if (err.code === 11000) return res.status(400).json({ message: 'Lesson order already exists' });
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Review assignment submission
 router.post('/submissions/:submissionId/review', async (req, res) => {
   const { submissionId } = req.params;
@@ -288,13 +441,32 @@ router.post('/students/:userId/course/:courseId/certificate', async (req, res) =
     const courseAssignment = student.courses.find(c => c.courseId.toString() === courseId);
     if (!courseAssignment) return res.status(404).json({ message: 'Course not assigned' });
 
-    // Check eligibility
-    const totalAssignments = course.assignments.length;
+    // Check eligibility: lessons + MCQ + 2 mini + 1 major
     const totalExams = course.exams.length;
-    const completedAssignments = courseAssignment.assignmentsCompleted.length;
     const passedExams = courseAssignment.examsPassed.length;
+    const completedMini = courseAssignment.assignmentsCompleted.filter(order => {
+      const a = course.assignments.find(x => x.order === order);
+      return a?.type === 'mini';
+    }).length;
+    const completedMajor = courseAssignment.assignmentsCompleted.filter(order => {
+      const a = course.assignments.find(x => x.order === order);
+      return a?.type === 'major';
+    }).length;
+    const completedGit = courseAssignment.assignmentsCompleted.filter(order => {
+      const a = course.assignments.find(x => x.order === order);
+      return a?.type === 'git';
+    }).length;
+    const progress = await StudentProgress.findOne({ userId: student.userId, courseId: course._id });
+    const totalLessons = await Lesson.aggregate([
+      { $lookup: { from: 'modules', localField: 'moduleId', foreignField: '_id', as: 'module' } },
+      { $unwind: '$module' },
+      { $match: { 'module.courseId': course._id } },
+      { $count: 'total' }
+    ]);
+    const totalLessonCount = totalLessons[0]?.total || 0;
+    const completedLessons = progress?.completedLessons?.length || 0;
 
-    if (completedAssignments < totalAssignments || passedExams < totalExams) {
+    if (completedLessons < totalLessonCount || passedExams < totalExams || completedMini < 2 || completedMajor < 1 || completedGit < 1) {
       return res.status(400).json({ message: 'Student not eligible for certificate' });
     }
 
