@@ -69,6 +69,16 @@ const upsertUser = async (u) => {
 
 const main = async () => {
   await connectDB();
+  try {
+    await Admin.collection.dropIndex('username_1');
+  } catch (_) {
+    // ignore if index doesn't exist
+  }
+  try {
+    await Student.collection.dropIndex('username_1');
+  } catch (_) {
+    // ignore if index doesn't exist
+  }
   for (const u of users) {
     await upsertUser(u);
   }
