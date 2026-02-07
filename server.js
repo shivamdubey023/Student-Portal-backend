@@ -67,9 +67,12 @@ const whitelist = [
   process.env.FRONTEND_ADMIN_URL || 'http://localhost:5174',
   'http://localhost:5174',
   'http://localhost:5175',
+  process.env.FRONTEND_PROD_URL,
+  process.env.FRONTEND_ADMIN_PROD_URL,
   // common deployed preview / vercel hostnames you may use
   'https://student-portal-five-mocha.vercel.app',
-  'https://student-portal-e3kb9q12r-kuro-shivs-projects.vercel.app'
+  'https://student-portal-e3kb9q12r-kuro-shivs-projects.vercel.app',
+  'https://sih-admin-chi.vercel.app'
 ].filter(Boolean);
 
 const corsOptions = {
