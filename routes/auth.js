@@ -33,8 +33,15 @@ router.post('/login', async (req, res) => {
       return res.json({ token, role: 'student', username: student.username, userId: student.id });
     } else {
       // Real DB: Find user by username or email
-      const user = await User.findOne({ $or: [{ email: usernameOrEmail }, { username: usernameOrEmail }] });
-      if (!user) return res.status(401).json({ message: 'Invalid username or email' });
+      let user = await User.findOne({ $or: [{ email: usernameOrEmail }, { username: usernameOrEmail }] });
+      if (!user) {
+        // Try to find by studentId
+        const student = await Student.findOne({ studentId: usernameOrEmail });
+        if (student) {
+          user = await User.findById(student.userId);
+        }
+      }
+      if (!user) return res.status(401).json({ message: 'Invalid username, email, or student ID' });
       if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ message: 'Invalid password' });
 
       if (user.role === 'admin') {
@@ -61,7 +68,7 @@ router.post('/seed', async (req, res) => {
   try {
     const seedAdmin = require('./seedAdmin');
     await seedAdmin();
-    res.json({ message: 'Database seeded successfully', credentials: { admin: 'Ankit/0806', student: 'Sreya/0806' } });
+    res.json({ message: 'Database seeded successfully', credentials: { admin: 'Ankit/0806', student: 'Cherry/123456' } });
   } catch (err) {
     console.error('Seeding error:', err);
     res.status(500).json({ error: 'Failed to seed database' });
