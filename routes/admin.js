@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 const { requireAuth } = require('../middleware/auth');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
@@ -131,8 +132,8 @@ router.post('/students', async (req, res) => {
 
     let courseValidityMap = new Map();
     if (Array.isArray(assignedCourses) && assignedCourses.length > 0) {
-      const courseDocs = await Course.find({ _id: { $in: assignedCourses } }, 'validityMonths');
-      courseValidityMap = new Map(courseDocs.map(c => [String(c._id), c.validityMonths]));
+      const courseDocs = await Course.find({ _id: { $in: assignedCourses } }, 'durationMonths');
+      courseValidityMap = new Map(courseDocs.map(c => [String(c._id), c.durationMonths]));
     }
 
     const courses = Array.isArray(assignedCourses) ? assignedCourses.map(courseId => {
@@ -143,7 +144,7 @@ router.post('/students', async (req, res) => {
         expiresAt.setMonth(expiresAt.getMonth() + months);
       }
       return {
-        courseId,
+        courseId: new mongoose.Types.ObjectId(courseId),
         assignedAt: new Date(),
         expiresAt,
         active: true,
@@ -242,7 +243,7 @@ router.post('/students/:userId/assign', async (req, res) => {
       expiresAt.setMonth(expiresAt.getMonth() + months);
     }
 
-    student.courses.push({ courseId: course._id, expiresAt, modulesCompleted: [], active: true });
+    student.courses.push({ courseId: course._id, expiresAt, active: true, assignmentsCompleted: [], assignmentsSubmitted: [], examsCompleted: [], examsPassed: [] });
     await student.save();
     return res.json({ message: 'Course assigned', expiresAt });
   } catch (err) {

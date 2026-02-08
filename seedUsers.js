@@ -4,6 +4,36 @@ const connectDB = require('./config/db');
 const User = require('./models/User');
 const Admin = require('./models/Admin');
 const Student = require('./models/Student');
+const Course = require('./models/Course');
+
+const generateCourseCode = (courseName) => {
+  if (!courseName) return 'XXXX';
+  const words = courseName.trim().split(/\s+/);
+  if (words.length === 1) return words[0].substring(0, 3).toUpperCase();
+  return words.map(w => w[0].toUpperCase()).join('').substring(0, 3);
+};
+
+const generateStudentIds = async (courseId) => {
+  const count = await Student.countDocuments() + 2001;
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, '0');
+  const year = today.getFullYear();
+
+  let courseCode = 'XXXX';
+  if (courseId) {
+    try {
+      const course = await Course.findById(courseId);
+      if (course) courseCode = generateCourseCode(course.title);
+    } catch (e) {
+      console.warn('Could not fetch course for code generation:', e.message);
+    }
+  }
+
+  return {
+    rollId: `${courseCode}-${count}`,
+    studentId: `SIH-${courseCode}-${year}-${day}-${count}`
+  };
+};
 
 const users = [
   {
@@ -59,7 +89,8 @@ const upsertUser = async (u) => {
   } else {
     let student = await Student.findOne({ userId: user._id });
     if (!student) {
-      student = new Student({ userId: user._id, isSuper: !!u.isSuper });
+      const ids = await generateStudentIds();
+      student = new Student({ userId: user._id, isSuper: !!u.isSuper, ...ids });
     } else {
       student.isSuper = !!u.isSuper;
     }
