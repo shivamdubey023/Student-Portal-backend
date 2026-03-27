@@ -45,6 +45,7 @@ const startServer = async () => {
     require('./routes/submissions').setMockMode(true);
     require('./routes/admin').setMockMode(true);
     require('./routes/auth').setMockMode(true);
+    require('./routes/platform').setMockMode(true);
     // Add debug routes
     app.post('/debug/courses', (req, res) => {
       const { title, description } = req.body || {};
@@ -117,6 +118,7 @@ app.use('/api/courses', require('./routes/courses'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/submissions', require('./routes/submissions'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/platform', require('./routes/platform'));
 
 // Health check
 app.get('/', (req, res) => res.json({ ok: true, env: process.env.NODE_ENV || 'development', note: 'Using in-memory mock DB for MVP testing' }));

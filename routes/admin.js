@@ -10,6 +10,8 @@ const User = require('../models/User');
 const Module = require('../models/Module');
 const Lesson = require('../models/Lesson');
 const StudentProgress = require('../models/StudentProgress');
+const PlatformSettings = require('../models/PlatformSettings');
+const PurchaseRequest = require('../models/PurchaseRequest');
 const mockDB = require('../db');
 
 let useMockDB = false;
@@ -46,8 +48,184 @@ const generateStudentIds = async (courseId) => {
   };
 };
 
+const getDefaultSettings = () => ({
+  brandName: mockDB.platformSettings.brandName,
+  supportEmail: mockDB.platformSettings.supportEmail,
+  supportPhone: mockDB.platformSettings.supportPhone,
+  whatsappNumber: mockDB.platformSettings.whatsappNumber,
+  whatsappBotEnabled: mockDB.platformSettings.whatsappBotEnabled,
+  whatsappAutomationNote: mockDB.platformSettings.whatsappAutomationNote,
+  internshipHeadline: mockDB.platformSettings.internshipHeadline,
+  paymentMethods: mockDB.platformSettings.paymentMethods
+});
+
+const getPlatformSettings = async () => {
+  if (useMockDB) {
+    return mockDB.platformSettings;
+  }
+
+  let settings = await PlatformSettings.findOne();
+  if (!settings) {
+    settings = await PlatformSettings.create(getDefaultSettings());
+  }
+  return settings;
+};
+
+const assignCourseToStudentRecord = async (student, course) => {
+  const alreadyAssigned = (student.courses || []).some((item) => String(item.courseId) === String(course._id));
+  if (alreadyAssigned) {
+    return false;
+  }
+
+  let expiresAt = null;
+  if (typeof course.validityMonths === 'number' && course.validityMonths > 0) {
+    expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + course.validityMonths);
+  }
+
+  student.courses.push({
+    courseId: course._id,
+    assignedAt: new Date(),
+    expiresAt,
+    active: true,
+    assignmentsCompleted: [],
+    assignmentsSubmitted: [],
+    examsCompleted: [],
+    examsPassed: []
+  });
+  course.enrolledCount = (course.enrolledCount || 0) + 1;
+  await student.save();
+  await course.save();
+  return true;
+};
+
 // Middleware: admin only
 router.use(requireAuth('admin'));
+
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await getPlatformSettings();
+    return res.json(settings);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Failed to load settings' });
+  }
+});
+
+router.put('/settings', async (req, res) => {
+  try {
+    const payload = {
+      brandName: req.body.brandName || 'SIH Learn',
+      supportEmail: req.body.supportEmail || '',
+      supportPhone: req.body.supportPhone || '',
+      whatsappNumber: req.body.whatsappNumber || '',
+      whatsappBotEnabled: req.body.whatsappBotEnabled !== false,
+      whatsappAutomationNote: req.body.whatsappAutomationNote || '',
+      internshipHeadline: req.body.internshipHeadline || '',
+      paymentMethods: Array.isArray(req.body.paymentMethods) ? req.body.paymentMethods : []
+    };
+
+    if (useMockDB) {
+      Object.assign(mockDB.platformSettings, payload);
+      return res.json(mockDB.platformSettings);
+    }
+
+    const settings = await PlatformSettings.findOneAndUpdate({}, payload, {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true
+    });
+    return res.json(settings);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Failed to update settings' });
+  }
+});
+
+router.get('/purchase-requests', async (req, res) => {
+  try {
+    if (useMockDB) {
+      const requests = mockDB.purchaseRequests.map((item) => ({
+        ...item,
+        courseId: mockDB.courses.find((course) => course._id === item.courseId) || item.courseId
+      }));
+      return res.json(requests);
+    }
+
+    const requests = await PurchaseRequest.find()
+      .populate('courseId', 'title price salePrice learningFormat enrollmentType certificateFee')
+      .sort({ createdAt: -1 });
+    return res.json(requests);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Failed to load purchase requests' });
+  }
+});
+
+router.put('/purchase-requests/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNotes } = req.body;
+
+    if (!['pending', 'contacted', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    if (useMockDB) {
+      const purchaseRequest = mockDB.purchaseRequests.find((item) => item._id === id);
+      if (!purchaseRequest) {
+        return res.status(404).json({ message: 'Purchase request not found' });
+      }
+      purchaseRequest.status = status;
+      purchaseRequest.adminNotes = adminNotes || '';
+      purchaseRequest.updatedAt = new Date();
+      if (status === 'approved' && purchaseRequest.requestedByUserId) {
+        const student = mockDB.students.find((item) => item.userId === purchaseRequest.requestedByUserId || item.id === purchaseRequest.requestedByUserId);
+        const course = mockDB.courses.find((item) => item._id === purchaseRequest.courseId);
+        if (student && course) {
+          student.courses = Array.isArray(student.courses) ? student.courses : [];
+          const alreadyAssigned = student.courses.some((item) => String(item.courseId) === String(course._id));
+          if (!alreadyAssigned) {
+            student.courses.push({
+              courseId: course._id,
+              assignedAt: new Date(),
+              active: true,
+              assignmentsCompleted: [],
+              assignmentsSubmitted: [],
+              examsCompleted: [],
+              examsPassed: []
+            });
+            course.enrolledCount = (course.enrolledCount || 0) + 1;
+          }
+        }
+      }
+      return res.json(purchaseRequest);
+    }
+
+    const purchaseRequest = await PurchaseRequest.findById(id);
+    if (!purchaseRequest) {
+      return res.status(404).json({ message: 'Purchase request not found' });
+    }
+
+    purchaseRequest.status = status;
+    purchaseRequest.adminNotes = adminNotes || '';
+
+    if (status === 'approved' && purchaseRequest.requestedByUserId) {
+      const student = await Student.findOne({ userId: purchaseRequest.requestedByUserId });
+      const course = await Course.findById(purchaseRequest.courseId);
+      if (student && course) {
+        await assignCourseToStudentRecord(student, course);
+      }
+    }
+
+    await purchaseRequest.save();
+    const populated = await PurchaseRequest.findById(id).populate('courseId', 'title price salePrice learningFormat enrollmentType certificateFee');
+    return res.json(populated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Failed to update purchase request' });
+  }
+});
 
 // Get all students
 router.get('/students', async (req, res) => {
@@ -132,8 +310,8 @@ router.post('/students', async (req, res) => {
 
     let courseValidityMap = new Map();
     if (Array.isArray(assignedCourses) && assignedCourses.length > 0) {
-      const courseDocs = await Course.find({ _id: { $in: assignedCourses } }, 'durationMonths');
-      courseValidityMap = new Map(courseDocs.map(c => [String(c._id), c.durationMonths]));
+      const courseDocs = await Course.find({ _id: { $in: assignedCourses } }, 'validityMonths');
+      courseValidityMap = new Map(courseDocs.map(c => [String(c._id), c.validityMonths]));
     }
 
     const courses = Array.isArray(assignedCourses) ? assignedCourses.map(courseId => {
@@ -234,18 +412,8 @@ router.post('/students/:userId/assign', async (req, res) => {
     const student = await Student.findOne({ userId });
     const course = await Course.findById(courseId);
     if (!student || !course) return res.status(404).json({ message: 'Student or Course not found' });
-
-    // Access validity based on course setting (0 or null = lifetime)
-    let expiresAt = null;
-    const months = course.validityMonths;
-    if (typeof months === 'number' && months > 0) {
-      expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + months);
-    }
-
-    student.courses.push({ courseId: course._id, expiresAt, active: true, assignmentsCompleted: [], assignmentsSubmitted: [], examsCompleted: [], examsPassed: [] });
-    await student.save();
-    return res.json({ message: 'Course assigned', expiresAt });
+    const assigned = await assignCourseToStudentRecord(student, course);
+    return res.json({ message: assigned ? 'Course assigned' : 'Course already assigned' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });
